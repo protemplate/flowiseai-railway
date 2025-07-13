@@ -12,8 +12,8 @@ RUN npm install -g flowise
 # Stage 2: Runtime stage
 FROM node:20-alpine
 
-# Install runtime dependencies
-RUN apk add --no-cache chromium git python3 py3-pip make g++ build-base cairo-dev pango-dev curl
+# Install runtime dependencies including PostgreSQL client for database initialization
+RUN apk add --no-cache chromium git python3 py3-pip make g++ build-base cairo-dev pango-dev curl postgresql-client
 
 # Set the environment variable for Puppeteer to find Chromium
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
@@ -22,10 +22,15 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 COPY --from=build /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=build /usr/local/bin /usr/local/bin
 
+# Copy initialization script
+COPY init-db.sh /init-db.sh
+RUN chmod +x /init-db.sh
+
 # Set environment variables
 ENV PORT=80
 
 # Expose the specified port
 EXPOSE ${PORT}
 
-ENTRYPOINT ["flowise", "start"]
+# Use the initialization script as entrypoint
+ENTRYPOINT ["/init-db.sh"]
