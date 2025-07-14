@@ -1,9 +1,44 @@
 version: '3.1'
 
 services:
-    flowise:
-        image: flowiseai/flowise
+    postgis:
+        image: postgis/postgis:latest
         restart: always
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=postgrespassword
+            - POSTGRES_DB=railway
+        ports:
+            - '5432:5432'
+        volumes:
+            - postgis_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U postgres']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    redis:
+        image: redis:7-alpine
+        restart: always
+        ports:
+            - '6379:6379'
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    flowise:
+        build: .
+        restart: always
+        depends_on:
+            postgis:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
         environment:
             - PORT=${PORT}
             - CORS_ORIGINS=${CORS_ORIGINS}
@@ -15,12 +50,13 @@ services:
             - DATABASE_PATH=${DATABASE_PATH}
             - DATABASE_TYPE=${DATABASE_TYPE}
             - DATABASE_PORT=${DATABASE_PORT}
-            - DATABASE_HOST=${DATABASE_HOST}
+            - DATABASE_HOST=postgis
             - DATABASE_NAME=${DATABASE_NAME}
             - DATABASE_USER=${DATABASE_USER}
             - DATABASE_PASSWORD=${DATABASE_PASSWORD}
             - DATABASE_SSL=${DATABASE_SSL}
             - DATABASE_SSL_KEY_BASE64=${DATABASE_SSL_KEY_BASE64}
+            - POSTGRES_DB=railway
             - APIKEY_STORAGE_TYPE=${APIKEY_STORAGE_TYPE}
             - APIKEY_PATH=${APIKEY_PATH}
             - SECRETKEY_PATH=${SECRETKEY_PATH}
@@ -40,7 +76,7 @@ services:
             - REMOVE_ON_AGE=${REMOVE_ON_AGE}
             - REMOVE_ON_COUNT=${REMOVE_ON_COUNT}
             - REDIS_URL=${REDIS_URL}
-            - REDIS_HOST=${REDIS_HOST}
+            - REDIS_HOST=redis
             - REDIS_PORT=${REDIS_PORT}
             - REDIS_PASSWORD=${REDIS_PASSWORD}
             - REDIS_USERNAME=${REDIS_USERNAME}
@@ -60,4 +96,7 @@ services:
             start_period: 30s
         volumes:
             - ~/.flowise:/root/.flowise
-        command: /bin/sh -c "sleep 3; flowise start"
+
+volumes:
+    postgis_data:
+    redis_data:

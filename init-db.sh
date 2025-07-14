@@ -21,6 +21,11 @@ else
   echo "Database '$DATABASE_NAME' created successfully."
 fi
 
-# Start Flowise
-echo "Starting Flowise..."
-exec flowise start
+# Start Flowise based on MODE
+if [ "$MODE" = "worker" ]; then
+  echo "Starting Flowise in worker mode..."
+  exec flowise start:worker
+else
+  echo "Starting Flowise in main mode..."
+  exec flowise start
+fi
