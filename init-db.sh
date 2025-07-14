@@ -24,7 +24,7 @@ fi
 # Start Flowise based on MODE
 if [ "$MODE" = "worker" ]; then
   echo "Starting Flowise in worker mode..."
-  exec flowise start:worker
+  exec flowise worker
 else
   echo "Starting Flowise in main mode..."
   exec flowise start
