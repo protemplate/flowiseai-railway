@@ -97,6 +97,35 @@ services:
         volumes:
             - ~/.flowise:/root/.flowise
 
+    # Example worker service (uncomment to enable)
+    # flowise-worker:
+    #     build: .
+    #     restart: always
+    #     depends_on:
+    #         postgis:
+    #             condition: service_healthy
+    #         redis:
+    #             condition: service_healthy
+    #     environment:
+    #         - MODE=worker  # Run in worker mode
+    #         - PORT=${PORT}
+    #         - CORS_ORIGINS=${CORS_ORIGINS}
+    #         - IFRAME_ORIGINS=${IFRAME_ORIGINS}
+    #         - DATABASE_PATH=${DATABASE_PATH}
+    #         - DATABASE_TYPE=${DATABASE_TYPE}
+    #         - DATABASE_PORT=${DATABASE_PORT}
+    #         - DATABASE_HOST=postgis
+    #         - DATABASE_NAME=${DATABASE_NAME}
+    #         - DATABASE_USER=${DATABASE_USER}
+    #         - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+    #         - POSTGRES_DB=railway
+    #         - WORKER_CONCURRENCY=${WORKER_CONCURRENCY}
+    #         - QUEUE_NAME=${QUEUE_NAME}
+    #         - REDIS_HOST=redis
+    #         - REDIS_PORT=${REDIS_PORT}
+    #     volumes:
+    #         - ~/.flowise:/root/.flowise
+
 volumes:
     postgis_data:
     redis_data:

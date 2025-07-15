@@ -65,26 +65,100 @@ If you already have n8n running with PostGIS on Railway, you can add Flowise to 
 
 Flowise supports queue mode for handling large numbers of predictions. This allows you to separate job submission from job execution and scale workers dynamically.
 
+### Prerequisites for Queue Mode
+
+1. **Shared Encryption Key**: All Flowise instances (main and workers) must use the same encryption key
+2. **Redis Service**: Deploy Redis in the same Railway environment
+3. **Database**: All instances share the same PostgreSQL database
+
+### Clean Setup Process (Recommended)
+
+To avoid encryption and data corruption issues, follow this order:
+
+1. **First, set up all environment variables** on both main and worker services
+2. **Generate a secure encryption key** (32+ characters)
+3. **Deploy Redis** to your Railway environment
+4. **Configure main server** with all required variables INCLUDING `FLOWISE_SECRETKEY_OVERWRITE`
+5. **Configure worker(s)** with identical encryption key
+6. **Deploy all services**
+7. **Only then create flows and credentials**
+
 ### Railway Deployment with Queue Mode
 
+> ⚠️ **Critical Setup Requirements**:
+> 1. **Set FLOWISE_SECRETKEY_OVERWRITE on ALL instances BEFORE first deployment**
+> 2. **The encryption key must be IDENTICAL across main server and all workers**
+> 3. **Railway's private networking requires IPv6 support - use `?family=0` in Redis URL**
+
 1. **Add Redis to your Railway environment:**
-   - Deploy Redis from Railway's template marketplace to the same environment
-   - Note the `RAILWAY_PRIVATE_DOMAIN` and `REDIS_PASSWORD` from the Redis service
+   - Go to your Railway project dashboard
+   - Click "New Service" → "Database" → "Add Redis"
+   - Deploy Redis to the **same environment** as Flowise
+   - Once deployed, click on the Redis service
+   - Go to the "Variables" tab
+   - Copy the `RAILWAY_PRIVATE_DOMAIN` value (it will be something like `redis-production-xxxx.railway.internal`)
+   - Copy the `REDISPASSWORD` value if authentication is enabled
 
 2. **Configure Flowise main server (job submission):**
+   - In your Flowise service, go to the Variables tab
+   - Add these environment variables:
    ```env
+   # MUST be set BEFORE creating any credentials or flows
+   FLOWISE_SECRETKEY_OVERWRITE=your-32-character-secret-key-here
+   
+   # Queue configuration
    MODE=queue
    QUEUE_NAME=flowise-queue
-   REDIS_HOST=${{RAILWAY_PRIVATE_DOMAIN}} # From your Redis service
-   REDIS_PORT=6379
-   REDIS_PASSWORD=${{REDIS_PASSWORD}} # From your Redis service
+   REDIS_URL=${{Redis.REDIS_PRIVATE_URL}}?family=0
    ```
+   
+   **Important notes:**
+   - Generate a secure 32+ character encryption key
+   - Set this BEFORE creating any flows or credentials
+   - Replace `Redis` with your actual Redis service name if different
+   - The `?family=0` parameter is required for BullMQ/ioredis IPv6 compatibility
 
 3. **Deploy Flowise worker(s):**
    - Deploy another instance of this Flowise template
    - Set the same Redis configuration as above
    - Set `MODE=worker` instead of `MODE=queue`
+   - **IMPORTANT**: Add the same encryption key as the main server:
+     ```env
+     FLOWISE_SECRETKEY_OVERWRITE=<your-encryption-key>
+     ```
+   - The encryption key must be identical across all instances (main and workers)
    - You can deploy multiple workers for parallel processing
+
+   **Note**: Workers need the same encryption key to decrypt credentials. Either:
+   - Set `FLOWISE_SECRETKEY_OVERWRITE` with the same value on all instances, or
+   - Mount a shared volume (not recommended on Railway due to complexity)
+
+### Troubleshooting Queue Mode
+
+**"Malformed UTF-8 data" error**:
+- This means the worker's encryption key doesn't match the main server's
+- Solution: Ensure `FLOWISE_SECRETKEY_OVERWRITE` is identical on all instances
+- If you already have data, you'll need to either:
+  - Export flows/credentials, set the same key everywhere, and re-import
+  - Find the auto-generated key from the main server logs
+
+**"ENOTFOUND redis.railway.internal" error**:
+- The Redis URL needs `?family=0` appended for IPv6 support
+- Ensure Redis is deployed in the same Railway environment
+- Use `${{Redis.REDIS_PRIVATE_URL}}?family=0` format
+
+**"ENOENT: no such file or directory" error**:
+- Worker can't find encryption key file
+- Solution: Set `FLOWISE_SECRETKEY_OVERWRITE` on the worker
+
+**"ZodError: nodes/edges Required" error**:
+- This indicates corrupted or incomplete flow data
+- Often caused by encryption key mismatches corrupting the data
+- Solutions:
+  1. Clear Redis queue: Connect to Redis and run `FLUSHDB`
+  2. Ensure all instances use the same encryption key
+  3. Recreate flows after fixing encryption keys
+  4. Check that main server and workers are running the same Flowise version
 
 ### Local Development with Queue Mode
 
